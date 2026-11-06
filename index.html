@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chits - Chat Notes & Boards</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        chits: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            accent: '#f59e0b',
+                            cork: '#d97706',
+                            fridge: '#e2e8f0'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                        handwriting: ['Caveat', 'Comic Sans MS', 'cursive']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts for Handwriting / Sticky Note Styles -->
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+    <!-- html2canvas for exporting shareable cards -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        /* Living Sky Header Keyframe Animations */
+        @keyframes floatCloud {
+            0% { transform: translateX(-150px); }
+            100% { transform: translateX(calc(100vw + 150px)); }
+        }
+        @keyframes sunPulse {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(253, 224, 71, 0.8)); }
+            50% { transform: scale(1.08); filter: drop-shadow(0 0 25px rgba(253, 224, 71, 1)); }
+        }
+        @keyframes moonGlow {
+            0%, 100% { filter: drop-shadow(0 0 10px rgba(226, 232, 240, 0.6)); }
+            50% { filter: drop-shadow(0 0 20px rgba(256, 256, 256, 0.9)); }
+        }
+        @keyframes birdFly {
+            0% { transform: translate(-50px, 0) scale(0.6); }
+            50% { transform: translate(50vw, -15px) scale(0.7); }
+            100% { transform: translate(calc(100vw + 50px), 10px) scale(0.6); }
+        }
+
+        .animate-cloud-1 { animation: floatCloud 38s linear infinite; }
+        .animate-cloud-2 { animation: floatCloud 52s linear infinite 12s; }
+        .animate-cloud-3 { animation: floatCloud 45s linear infinite 24s; }
+        .animate-sun { animation: sunPulse 6s ease-in-out infinite; }
+        .animate-moon { animation: moonGlow 5s ease-in-out infinite; }
+        .animate-bird { animation: birdFly 22s ease-in-out infinite; }
+
+        /* Mobile Touch & Performance Optimization */
+        *, ::before, ::after {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .sticky-note, .space-card, button, nav button, section {
+            will-change: transform, opacity;
+            transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Surface Textures */
+        .bg-corkboard {
+            background-color: #d7ccc8;
+            background-image: radial-gradient(#b0bec5 1px, transparent 0);
+            background-size: 16px 16px;
+        }
+        .bg-fridge-metal {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
+        }
+        .bg-wall-texture {
+            background-color: #f1f5f9;
+            background-image: linear-gradient(90deg, rgba(200,200,200,.15) 1px, transparent 0), linear-gradient(rgba(200,200,200,.15) 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.4); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 0.6); }
+
+        .sticky-note {
+            box-shadow: 3px 5px 12px rgba(0,0,0,0.15);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            touch-action: none;
+        }
+        .sticky-note:hover, .sticky-note:active {
+            transform: translateY(-4px) rotate(0deg) scale(1.02) !important;
+            box-shadow: 6px 12px 20px rgba(0,0,0,0.25);
+            z-index: 30;
+        }
+
+        .space-canvas {
+            min-height: calc(100vh - 180px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans transition-colors duration-300 antialiased overflow-x-hidden selection:bg-chits-500 selection:text-white">
+
+    <!-- Main Application Container -->
+    <div id="app" class="flex h-screen overflow-hidden relative">
+
+        <!-- Mobile Drawer Overlay -->
+        <div id="sidebar-overlay" onclick="toggleSidebar(false)" class="fixed inset-0 bg-black/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+        <!-- Sidebar Navigation Drawer -->
+        <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none">
+            <!-- Sidebar Header -->
+            <div class="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-chits-500 to-sky-400 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-sky-500/30">
+                        <i class="fa-solid fa-note-sticky"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-lg tracking-tight leading-none bg-gradient-to-r from-chits-600 to-sky-500 bg-clip-text text-transparent">Chits</h1>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">Notes & Boards</span>
+                    </div>
+                </div>
+                <button onclick="toggleSidebar(false)" class="md:hidden p-2 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Navigation Items -->
+            <nav class="flex-1 overflow-y-auto p-3 space-y-1">
+                <div class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase px-3 pt-2 pb-1">Primary</div>
+                
+                <button onclick="switchView('chat')" id="nav-chat" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all bg-sky-50 dark:bg-sky-900/30 text-chits-600 dark:text-sky-400">
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-comments w-5"></i>
+                        <span>Chat Stream</span>
+                    </div>
+                    <span id="badge-chat-count" class="bg-chits-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+                </button>
+
+                <button onclick="switchView('kanban')" id="nav-kanban" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all">
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-table-columns w-5 text-indigo-500"></i>
+                        <span>Kanban Board</span>
+                    </div>
+                    <span id="badge-kanban-count" class="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-2 py-0.5 rounded-full">0</span>
+                </button>
+
+                <button onclick="switchView('calendar')" id="nav-calendar" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all">
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-calendar-days w-5 text-rose-500"></i>
+                        <span>Calendar & Reminders</span>
+                    </div>
+                </button>
+
+                <button onclick="switchView('focus')" id="nav-focus" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all">
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-stopwatch w-5 text-amber-500"></i>
+                        <span>Focus Mode</span>
+                    </div>
+                </button>
+
+                <div class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase px-3 pt-4 pb-1">Creative Spaces</div>
+
+                <button onclick="switchSpace('fridge')" id="nav-space-fridge" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all">
+                    <i class="fa-solid fa-box-archive w-5 text-teal-500"></i>
+                    <span>Fridge Magnets</span>
+                </button>
+
+                <button onclick="switchSpace('desk')" id="nav-space-desk" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all">
+                    <i class="fa-solid fa-desktop w-5 text-amber-600"></i>
+                    <span>Desk Surface</span>
+                </button>
+
+                <button onclick="switchSpace('cork')" id="nav-space-cork" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all">
+                    <i class="fa-solid fa-thumbtack w-5 text-chits-cork"></i>
+                    <span>Cork Board</span>
+                </button>
+
+                <button onclick="switchSpace('wall')" id="nav-space-wall" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all">
+                    <i class="fa-solid fa-border-all w-5 text-purple-500"></i>
+                    <span>Wall Canvas</span>
+                </button>
+            </nav>
+
+            <!-- Sidebar Footer Stats -->
+            <div class="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
+                <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <span>Total Chits: <strong id="total-chits-count" class="text-gray-700 dark:text-gray-200">0</strong></span>
+                    <button onclick="toggleDarkMode()" class="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors" title="Toggle Light/Dark Theme">
+                        <i id="theme-toggle-icon" class="fa-solid fa-moon"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content View Area -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+
+            <!-- LIVING SKY HEADER -->
+            <header id="sky-header" class="relative h-28 sm:h-32 w-full transition-all duration-700 overflow-hidden flex-shrink-0 shadow-md bg-gradient-to-b from-sky-400 via-sky-300 to-sky-100 dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900 border-b border-sky-300/40 dark:border-indigo-900/40">
+                
+                <!-- Sun / Moon Toggles -->
+                <div id="sky-sun" class="absolute top-4 left-8 sm:left-14 w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-yellow-300 animate-sun cursor-pointer z-10 transition-all duration-700" onclick="toggleSkyTheme()" title="Click to toggle Day/Night sky"></div>
+                <div id="sky-moon" class="absolute top-4 left-8 sm:left-14 w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-slate-200 animate-moon cursor-pointer z-10 hidden transition-all duration-700" onclick="toggleSkyTheme()" title="Click to toggle Day/Night sky">
+                    <div class="w-3 h-3 rounded-full bg-slate-300/60 absolute top-2 left-3"></div>
+                    <div class="w-2 h-2 rounded-full bg-slate-300/60 absolute bottom-3 right-3"></div>
+                </div>
+
+                <!-- Animated Clouds -->
+                <div class="absolute inset-0 pointer-events-none opacity-80 dark:opacity-20">
+                    <div class="absolute top-2 animate-cloud-1 text-white text-4xl sm:text-6xl filter drop-shadow-sm"><i class="fa-solid fa-cloud"></i></div>
+                    <div class="absolute top-6 animate-cloud-2 text-white/80 text-3xl sm:text-5xl filter drop-shadow-sm"><i class="fa-solid fa-cloud"></i></div>
+                    <div class="absolute top-4 animate-cloud-3 text-white/90 text-4xl sm:text-5xl filter drop-shadow-sm"><i class="fa-solid fa-cloud"></i></div>
+                </div>
+
+                <!-- Flying Bird Accent -->
+                <div class="absolute top-8 pointer-events-none animate-bird text-slate-700 dark:text-indigo-200 text-xs sm:text-sm opacity-60">
+                    <i class="fa-solid fa-crow"></i>
+                </div>
+
+                <!-- Header Foreground Controls -->
+                <div class="absolute inset-x-0 bottom-0 px-4 py-3 flex items-center justify-between z-20 bg-gradient-to-t from-black/20 via-black/5 to-transparent text-white">
+                    <div class="flex items-center space-x-3">
+                        <button onclick="toggleSidebar(true)" class="md:hidden p-2 rounded-xl bg-white/20 backdrop-blur-md hover:bg-white/30 text-white transition-all">
+                            <i class="fa-solid fa-bars text-lg"></i>
+                        </button>
+                        <div>
+                            <h2 id="view-title" class="text-xl sm:text-2xl font-black tracking-tight drop-shadow-md">Chat Stream</h2>
+                            <p id="view-subtitle" class="text-xs text-white/80 font-medium drop-shadow hidden sm:block">Write quick notes, organize into boards & spaces later</p>
+                        </div>
+                    </div>
+
+                    <!-- Header Right Tools -->
+                    <div class="flex items-center space-x-2">
+                        <!-- Global Search -->
+                        <div class="relative hidden xs:block">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-white/70"></i>
+                            <input type="text" id="global-search-input" oninput="handleSearch(this.value)" placeholder="Search chits or #tags..." class="pl-8 pr-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-xs text-white placeholder-white/70 border border-white/20 focus:outline-none focus:bg-white/30 transition-all w-32 sm:w-48">
+                        </div>
+
+                        <!-- Gemini AI Trigger -->
+                        <button onclick="triggerGeminiAiAssist()" class="px-3 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-gray-900 text-xs font-bold transition-all flex items-center space-x-1.5 shadow-md active:scale-95">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span class="hidden sm:inline">AI Assist</span>
+                        </button>
+
+                        <!-- Sky Switcher -->
+                        <button onclick="toggleSkyTheme()" class="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 text-white text-xs font-semibold transition-all flex items-center space-x-1.5 border border-white/20 shadow-sm">
+                            <i id="sky-toggle-icon" class="fa-solid fa-sun"></i>
+                            <span id="sky-toggle-label" class="hidden xs:inline">Day Sky</span>
+                        </button>
+
+                        <!-- Sort Toggle -->
+                        <button id="btn-chat-sort" onclick="toggleChatSort()" class="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 text-white text-xs font-semibold transition-all flex items-center space-x-1 border border-white/20">
+                            <i class="fa-solid fa-arrow-down-short-wide"></i>
+                            <span id="chat-sort-label" class="hidden sm:inline">Recent</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- VIEW: CHAT STREAM -->
+            <section id="view-chat" class="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-gray-900">
+                <!-- Hashtag Filter Bar -->
+                <div id="tag-bar" class="px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-800/50 backdrop-blur flex items-center space-x-2 overflow-x-auto text-xs hidden">
+                    <span class="text-gray-400 font-semibold uppercase text-[10px]">Tags:</span>
+                    <div id="tag-chips-container" class="flex items-center space-x-1.5"></div>
+                </div>
+
+                <!-- Chat Stream Messages Scroll Container -->
+                <div id="chat-stream" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 max-w-4xl w-full mx-auto">
+                    <div id="chat-empty-state" class="text-center py-16 px-4">
+                        <div class="w-20 h-20 mx-auto rounded-3xl bg-sky-100 dark:bg-sky-900/40 text-chits-500 flex items-center justify-center text-3xl mb-4 shadow-inner">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200">Start Writing Your Thoughts</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto mt-1">Send yourself notes, tasks, or lists. You can pin, organize into Kanban columns, or stick them onto Corkboards anytime!</p>
+                    </div>
+                </div>
+
+                <!-- Chat Input Bar -->
+                <div class="p-3 sm:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800/90 backdrop-blur-lg">
+                    <form id="chat-form" onsubmit="handleSendChat(event)" class="max-w-4xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        
+                        <div class="relative flex-1">
+                            <textarea id="chat-input" rows="1" placeholder="Type a chit note, #tag, task list, or speak..." class="w-full pl-4 pr-16 py-3 bg-gray-100 dark:bg-gray-700/70 border border-transparent focus:border-chits-500 dark:focus:border-sky-400 rounded-2xl focus:outline-none text-sm resize-none transition-all dark:text-white" onkeydown="handleInputKeydown(event)"></textarea>
+                            
+                            <div class="absolute right-3 top-2.5 flex items-center space-x-1">
+                                <button type="button" id="btn-voice-record" onclick="toggleVoiceRecording()" class="p-1.5 text-gray-400 hover:text-rose-500 transition-colors" title="Voice Dictation">
+                                    <i id="voice-record-icon" class="fa-solid fa-microphone text-base"></i>
+                                </button>
+                                <button type="button" onclick="triggerMockAttachment()" class="p-1.5 text-gray-400 hover:text-chits-500 dark:hover:text-sky-400 transition-colors">
+                                    <i class="fa-solid fa-paperclip text-base"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between sm:justify-start space-x-2">
+                            <select id="chat-type-select" class="bg-gray-100 dark:bg-gray-700 text-xs font-semibold px-3 py-3 rounded-2xl border-none focus:ring-2 focus:ring-chits-500 dark:text-gray-200 cursor-pointer">
+                                <option value="note">📝 Text Note</option>
+                                <option value="todo">☑️ Checklist</option>
+                                <option value="sticky">📌 Sticky Chits</option>
+                            </select>
+
+                            <button type="submit" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-chits-500 to-sky-500 hover:from-chits-600 hover:to-sky-600 text-white font-semibold text-sm shadow-md shadow-sky-500/25 flex items-center justify-center space-x-2 transition-all active:scale-95">
+                                <span>Send</span>
+                                <i class="fa-solid fa-paper-plane text-xs"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- VIEW: KANBAN BOARD -->
+            <section id="view-kanban" class="flex-1 overflow-x-auto p-3 sm:p-6 bg-slate-100 dark:bg-gray-900 hidden">
+                <div class="flex space-x-3 sm:space-x-4 h-full min-w-max pb-4">
+                    <!-- Column: To Do -->
+                    <div class="w-72 sm:w-80 flex flex-col bg-slate-200/60 dark:bg-gray-800/60 rounded-3xl p-3 sm:p-4 border border-slate-300/50 dark:border-gray-700/50 shadow-sm">
+                        <div class="flex items-center justify-between pb-3 mb-2 border-b border-gray-300 dark:border-gray-700">
+                            <h3 class="font-bold text-sm text-gray-700 dark:text-gray-200 flex items-center space-x-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                                <span>To Do</span>
+                            </h3>
+                            <span id="kanban-count-todo" class="text-xs bg-gray-300 dark:bg-gray-700 px-2 py-0.5 rounded-full font-bold text-gray-600 dark:text-gray-300">0</span>
+                        </div>
+                        <div id="kanban-col-todo" class="flex-1 overflow-y-auto space-y-3 pr-1 min-h-[150px]" ondragover="allowDrop(event)" ondrop="dropCard(event, 'todo')"></div>
+                        <button onclick="promptQuickKanbanAdd('todo')" class="mt-3 w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-chits-500 rounded-2xl text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-chits-500 transition-colors">
+                            + Add Card
+                        </button>
+                    </div>
+
+                    <!-- Column: In Progress -->
+                    <div class="w-72 sm:w-80 flex flex-col bg-slate-200/60 dark:bg-gray-800/60 rounded-3xl p-3 sm:p-4 border border-slate-300/50 dark:border-gray-700/50 shadow-sm">
+                        <div class="flex items-center justify-between pb-3 mb-2 border-b border-gray-300 dark:border-gray-700">
+                            <h3 class="font-bold text-sm text-gray-700 dark:text-gray-200 flex items-center space-x-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+                                <span>In Progress</span>
+                            </h3>
+                            <span id="kanban-count-progress" class="text-xs bg-gray-300 dark:bg-gray-700 px-2 py-0.5 rounded-full font-bold text-gray-600 dark:text-gray-300">0</span>
+                        </div>
+                        <div id="kanban-col-progress" class="flex-1 overflow-y-auto space-y-3 pr-1 min-h-[150px]" ondragover="allowDrop(event)" ondrop="dropCard(event, 'progress')"></div>
+                        <button onclick="promptQuickKanbanAdd('progress')" class="mt-3 w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-chits-500 rounded-2xl text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-chits-500 transition-colors">
+                            + Add Card
+                        </button>
+                    </div>
+
+                    <!-- Column: Ideas & Review -->
+                    <div class="w-72 sm:w-80 flex flex-col bg-slate-200/60 dark:bg-gray-800/60 rounded-3xl p-3 sm:p-4 border border-slate-300/50 dark:border-gray-700/50 shadow-sm">
+                        <div class="flex items-center justify-between pb-3 mb-2 border-b border-gray-300 dark:border-gray-700">
+                            <h3 class="font-bold text-sm text-gray-700 dark:text-gray-200 flex items-center space-x-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+                                <span>Ideas & Review</span>
+                            </h3>
+                            <span id="kanban-count-ideas" class="text-xs bg-gray-300 dark:bg-gray-700 px-2 py-0.5 rounded-full font-bold text-gray-600 dark:text-gray-300">0</span>
+                        </div>
+                        <div id="kanban-col-ideas" class="flex-1 overflow-y-auto space-y-3 pr-1 min-h-[150px]" ondragover="allowDrop(event)" ondrop="dropCard(event, 'ideas')"></div>
+                        <button onclick="promptQuickKanbanAdd('ideas')" class="mt-3 w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-chits-500 rounded-2xl text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-chits-500 transition-colors">
+                            + Add Card
+                        </button>
+                    </div>
+
+                    <!-- Column: Completed -->
+                    <div class="w-72 sm:w-80 flex flex-col bg-slate-200/60 dark:bg-gray-800/60 rounded-3xl p-3 sm:p-4 border border-slate-300/50 dark:border-gray-700/50 shadow-sm">
+                        <div class="flex items-center justify-between pb-3 mb-2 border-b border-gray-300 dark:border-gray-700">
+                            <h3 class="font-bold text-sm text-gray-700 dark:text-gray-200 flex items-center space-x-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                                <span>Completed</span>
+                            </h3>
+                            <span id="kanban-count-done" class="text-xs bg-gray-300 dark:bg-gray-700 px-2 py-0.5 rounded-full font-bold text-gray-600 dark:text-gray-300">0</span>
+                        </div>
+                        <div id="kanban-col-done" class="flex-1 overflow-y-auto space-y-3 pr-1 min-h-[150px]" ondragover="allowDrop(event)" ondrop="dropCard(event, 'done')"></div>
+                        <button onclick="promptQuickKanbanAdd('done')" class="mt-3 w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-chits-500 rounded-2xl text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-chits-500 transition-colors">
+                            + Add Card
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: CREATIVE CANVAS SPACES -->
+            <section id="view-spaces" class="flex-1 overflow-auto relative p-6 hidden space-canvas transition-colors duration-500">
+                <div class="absolute top-4 right-4 z-20 flex items-center space-x-2">
+                    <button onclick="promptAddSpaceChit()" class="bg-chits-500 hover:bg-chits-600 text-white font-bold text-xs px-3.5 py-2 rounded-full shadow-lg flex items-center space-x-1.5 transition-all active:scale-95">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Add Chit Here</span>
+                    </button>
+                    <div class="hidden sm:flex bg-white/80 dark:bg-gray-800/80 backdrop-blur-md px-3 py-2 rounded-full text-xs font-medium text-gray-600 dark:text-gray-300 shadow-md items-center">
+                        <i class="fa-solid fa-hand-pointer mr-1.5 text-chits-500"></i> Drag items anywhere
+                    </div>
+                </div>
+
+                <div id="space-canvas-items" class="relative w-full h-full min-h-[600px]"></div>
+            </section>
+
+            <!-- VIEW: CALENDAR & REMINDERS -->
+            <section id="view-calendar" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50 dark:bg-gray-900 hidden">
+                <div class="max-w-5xl mx-auto space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-bold text-gray-800 dark:text-gray-100" id="calendar-month-year">Calendar Reminders</h3>
+                        <div class="flex space-x-2">
+                            <button onclick="changeMonth(-1)" class="p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"><i class="fa-solid fa-chevron-left"></i></button>
+                            <button onclick="changeMonth(1)" class="p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-7 gap-2 text-center text-xs font-bold text-gray-400 uppercase">
+                        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                    </div>
+
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-2"></div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-3xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm">
+                        <h4 class="font-bold text-sm text-gray-700 dark:text-gray-200 mb-3 flex items-center space-x-2">
+                            <i class="fa-solid fa-bell text-rose-500"></i>
+                            <span>All Scheduled Reminders</span>
+                        </h4>
+                        <div id="reminders-list" class="space-y-2"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: FOCUS MODE TIMER -->
+            <section id="view-focus" class="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-indigo-900 via-slate-900 to-gray-900 text-white hidden flex flex-col items-center justify-center">
+                <div class="max-w-md w-full bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 text-center shadow-2xl relative overflow-hidden">
+                    
+                    <div class="mb-6 inline-block relative">
+                        <div id="focus-mascot" class="w-24 h-24 mx-auto rounded-full bg-gradient-to-tr from-amber-400 to-yellow-200 flex items-center justify-center text-4xl shadow-lg shadow-amber-500/30 transform hover:scale-105 transition-transform duration-300">
+                            🐶
+                        </div>
+                        <span id="mascot-speech" class="absolute -top-3 -right-6 bg-amber-400 text-gray-900 font-extrabold text-[10px] uppercase tracking-wider px-2 py-1 rounded-full shadow">Ready!</span>
+                    </div>
+
+                    <h3 class="text-2xl font-black mb-1">Focus Companion</h3>
+                    <p class="text-xs text-indigo-200 mb-6">Stay focused on your task. Write quick notes while timing.</p>
+
+                    <div id="timer-display" class="text-6xl font-black tracking-tight text-white font-mono my-4 drop-shadow-md">
+                        25:00
+                    </div>
+
+                    <div class="flex items-center justify-center space-x-4 mb-6">
+                        <button id="btn-focus-start" onclick="toggleFocusTimer()" class="px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-gray-900 font-extrabold shadow-lg shadow-amber-500/30 active:scale-95 transition-all">
+                            Start Focus
+                        </button>
+                        <button onclick="resetFocusTimer()" class="p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-all">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-white/10 text-left">
+                        <label class="text-xs font-semibold text-indigo-200 block mb-2">Quick Focus Note</label>
+                        <div class="flex space-x-2">
+                            <input id="focus-quick-input" type="text" placeholder="Record thought without leaving..." class="flex-1 px-4 py-2.5 rounded-xl bg-black/30 border border-white/10 text-sm focus:outline-none focus:border-amber-400 text-white placeholder-indigo-300/50" onkeydown="if(event.key==='Enter'){event.preventDefault();saveFocusNote();}">
+                            <button onclick="saveFocusNote()" class="px-4 py-2.5 rounded-xl bg-amber-400 text-gray-900 font-bold text-xs hover:bg-amber-300 transition-colors">
+                                Save
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 text-left">
+                        <h4 class="text-xs font-bold text-indigo-200 uppercase tracking-wider mb-2">Today's Focus Log</h4>
+                        <div id="focus-history-list" class="space-y-1.5 max-h-32 overflow-y-auto text-xs text-indigo-100"></div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL: SHAREABLE NOTE EXPORTER -->
+    <div id="modal-share-card" onclick="if(event.target===this)closeShareModal()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <h3 class="font-bold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+                    <span>Export Shareable Card</span>
+                </h3>
+                <button onclick="closeShareModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 flex flex-col items-center bg-gray-50 dark:bg-gray-900/50">
+                <div class="flex space-x-2 mb-6">
+                    <button onclick="setShareTheme('gradient-sky')" class="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 ring-2 ring-offset-2 ring-transparent focus:ring-sky-500"></button>
+                    <button onclick="setShareTheme('gradient-sunset')" class="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-400 to-rose-500 ring-2 ring-offset-2 ring-transparent focus:ring-amber-500"></button>
+                    <button onclick="setShareTheme('theme-cork')" class="w-8 h-8 rounded-full bg-amber-800 ring-2 ring-offset-2 ring-transparent focus:ring-amber-700"></button>
+                    <button onclick="setShareTheme('theme-dark')" class="w-8 h-8 rounded-full bg-gray-900 ring-2 ring-offset-2 ring-transparent focus:ring-gray-600"></button>
+                </div>
+
+                <div id="share-card-canvas" class="w-full p-8 rounded-3xl bg-gradient-to-tr from-sky-400 to-indigo-500 text-white shadow-xl transition-all relative overflow-hidden min-h-[220px] flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2 text-xs font-bold tracking-wide uppercase opacity-80">
+                            <i class="fa-solid fa-note-sticky"></i>
+                            <span>Chits Note</span>
+                        </div>
+                        <span id="share-card-date" class="text-[10px] opacity-75">Today</span>
+                    </div>
+
+                    <p id="share-card-text" class="text-lg sm:text-xl font-bold leading-relaxed mb-6">
+                        "Your note content preview..."
+                    </p>
+
+                    <div class="pt-4 border-t border-white/20 flex items-center justify-between text-xs opacity-80">
+                        <span>Organized with Chits</span>
+                        <i class="fa-solid fa-heart"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3 bg-white dark:bg-gray-800">
+                <button onclick="closeShareModal()" class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400">Cancel</button>
+                <button onclick="downloadShareCard()" class="px-5 py-2 rounded-xl bg-chits-500 hover:bg-chits-600 text-white text-sm font-bold shadow-md shadow-sky-500/30 flex items-center space-x-2">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Save Image</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD REMINDER -->
+    <div id="modal-reminder" onclick="if(event.target===this)closeReminderModal()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700">
+            <h3 class="font-bold text-gray-800 dark:text-gray-100 mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-clock text-rose-500"></i>
+                <span>Set Note Reminder</span>
+            </h3>
+            <input type="date" id="reminder-date-input" class="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-sm mb-4 focus:ring-2 focus:ring-chits-500 dark:text-white">
+            <div class="flex justify-end space-x-2">
+                <button onclick="closeReminderModal()" class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-500">Cancel</button>
+                <button onclick="saveNoteReminder()" class="px-4 py-2 rounded-xl bg-rose-500 text-white text-sm font-bold shadow">Save Reminder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD SPACE CHIT -->
+    <div id="modal-add-space-chit" onclick="if(event.target===this)closeSpaceChitModal()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700">
+            <h3 class="font-bold text-gray-800 dark:text-gray-100 mb-1 flex items-center space-x-2">
+                <i class="fa-solid fa-plus text-chits-500"></i>
+                <span id="modal-space-title">Add Chit</span>
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Create a note directly on this surface canvas.</p>
+            
+            <textarea id="space-chit-text-input" rows="3" placeholder="Type your note here..." class="w-full px-4 py-3 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl text-sm focus:outline-none focus:border-chits-500 dark:text-white resize-none mb-4" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();confirmAddSpaceChit();}"></textarea>
+            
+            <div class="flex justify-end space-x-2">
+                <button onclick="closeSpaceChitModal()" class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-500">Cancel</button>
+                <button onclick="confirmAddSpaceChit()" class="px-5 py-2 rounded-xl bg-chits-500 hover:bg-chits-600 text-white text-sm font-bold shadow-md shadow-sky-500/30">Add Chit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: QUICK ADD KANBAN CARD -->
+    <div id="modal-add-kanban" onclick="if(event.target===this)closeKanbanModal()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700">
+            <h3 class="font-bold text-gray-800 dark:text-gray-100 mb-1 flex items-center space-x-2">
+                <i class="fa-solid fa-square-plus text-indigo-500"></i>
+                <span id="modal-kanban-title">Add Kanban Card</span>
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Add a new task card to this column.</p>
+            
+            <textarea id="kanban-card-text-input" rows="3" placeholder="Type task details..." class="w-full px-4 py-3 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl text-sm focus:outline-none focus:border-indigo-500 dark:text-white resize-none mb-4" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();confirmAddKanbanCard();}"></textarea>
+            
+            <div class="flex justify-end space-x-2">
+                <button onclick="closeKanbanModal()" class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-500">Cancel</button>
+                <button onclick="confirmAddKanbanCard()" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-md shadow-indigo-500/30">Add Card</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT CHIT DETAILS -->
+    <div id="modal-edit-chit" onclick="if(event.target===this)closeEditModal()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-gray-800 dark:text-gray-100 flex items-center space-x-2">
+                    <i class="fa-solid fa-pen-to-square text-chits-500"></i>
+                    <span>Edit Chit Details</span>
+                </h3>
+                <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <textarea id="edit-chit-text-input" rows="4" class="w-full px-4 py-3 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl text-sm focus:outline-none focus:border-chits-500 dark:text-white resize-none mb-4"></textarea>
+            
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Chit Color Accent</label>
+                <div class="flex space-x-2">
+                    <button onclick="setChitColor('yellow')" class="w-7 h-7 rounded-full bg-amber-200 ring-2 ring-transparent focus:ring-amber-500"></button>
+                    <button onclick="setChitColor('blue')" class="w-7 h-7 rounded-full bg-sky-200 ring-2 ring-transparent focus:ring-sky-500"></button>
+                    <button onclick="setChitColor('green')" class="w-7 h-7 rounded-full bg-emerald-200 ring-2 ring-transparent focus:ring-emerald-500"></button>
+                    <button onclick="setChitColor('pink')" class="w-7 h-7 rounded-full bg-rose-200 ring-2 ring-transparent focus:ring-rose-500"></button>
+                    <button onclick="setChitColor('purple')" class="w-7 h-7 rounded-full bg-purple-200 ring-2 ring-transparent focus:ring-purple-500"></button>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-2">
+                <button onclick="closeEditModal()" class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-500">Cancel</button>
+                <button onclick="saveChitEdit()" class="px-5 py-2 rounded-xl bg-chits-500 hover:bg-chits-600 text-white text-sm font-bold shadow-md shadow-sky-500/30">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT APPLICATION -->
+    <script>
+        // --- APP STATE ---
+        let chits = [];
+        let currentView = 'chat';
+        let currentSpace = 'fridge';
+        let currentSort = 'recent';
+        let skyTheme = 'day';
+        let activeShareId = null;
+        let activeReminderId = null;
+        let activeEditId = null;
+        let searchQuery = '';
+        let activeTagFilter = null;
+        let isRecording = false;
+        let recognition = null;
+        let activeEditColor = null;
+        let targetKanbanColumn = 'todo';
+
+        // Focus Timer State
+        let timerInterval = null;
+        let timerSeconds = 25 * 60;
+        let isTimerRunning = false;
+        let focusHistory = [];
+
+        // Calendar State
+        let calendarDate = new Date();
+
+        // Sample Notes
+        const initialSamples = [
+            { id: '1', text: '🎨 Design new app icon draft for #Chits iOS launch', type: 'note', kanbanCol: 'progress', pinned: true, space: 'cork', x: 40, y: 50, date: new Date().toISOString(), reminder: null, color: 'yellow' },
+            { id: '2', text: 'Buy coffee beans & almond milk #shopping', type: 'todo', items: [{ text: 'Coffee Beans', done: true }, { text: 'Almond Milk', done: false }], kanbanCol: 'todo', pinned: false, space: 'fridge', x: 50, y: 80, date: new Date().toISOString(), reminder: null, color: 'blue' },
+            { id: '3', text: 'Remember to practice 25-minute Pomodoro sessions daily! #productivity', type: 'sticky', kanbanCol: 'done', pinned: true, space: 'desk', x: 60, y: 40, date: new Date().toISOString(), reminder: null, color: 'green' }
+        ];
+
+        window.onload = function() {
+            loadFromLocalStorage();
+            initSpeechRecognition();
+            renderApp();
+            updateSkyVisuals();
+            renderCalendar();
+
+            const today = new Date().toISOString().split('T')[0];
+            const reminderInput = document.getElementById('reminder-date-input');
+            if (reminderInput) reminderInput.value = today;
+        };
+
+        // --- SPEECH RECOGNITION ---
+        function initSpeechRecognition() {
+            if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    const input = document.getElementById('chat-input');
+                    if (input) input.value += (input.value ? ' ' : '') + transcript;
+                    toggleVoiceRecording(false);
+                };
+
+                recognition.onerror = function() { toggleVoiceRecording(false); };
+                recognition.onend = function() { toggleVoiceRecording(false); };
+            }
+        }
+
+        function toggleVoiceRecording(forceState) {
+            const btn = document.getElementById('btn-voice-record');
+            const icon = document.getElementById('voice-record-icon');
+            if (!recognition) return;
+
+            if (forceState !== undefined) {
+                isRecording = !forceState;
+            }
+
+            if (!isRecording) {
+                try {
+                    recognition.start();
+                    isRecording = true;
+                    if (icon) icon.className = "fa-solid fa-microphone text-base text-rose-500 animate-pulse";
+                } catch(e) {}
+            } else {
+                try {
+                    recognition.stop();
+                } catch(e) {}
+                isRecording = false;
+                if (icon) icon.className = "fa-solid fa-microphone text-base text-gray-400";
+            }
+        }
+
+        // --- GEMINI AI ASSISTANT ---
+        async function triggerGeminiAiAssist() {
+            const input = document.getElementById('chat-input');
+            const userPrompt = input ? input.value.trim() : "";
+            const query = userPrompt || "Suggest 3 productive tasks I should accomplish today.";
+
+            if (input) input.value = "✨ Gemini AI is thinking...";
+
+            try {
+                const systemPrompt = "You are an intelligent note assistant inside the Chits app. Convert user input or request into concise, actionable notes or structured checklist items.";
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: query }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] }
+                    })
+                });
+
+                const data = await response.json();
+                const aiResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || "No AI response generated.";
+
+                chits.unshift({
+                    id: Date.now().toString(),
+                    text: `✨ AI Assistant Suggestion:\n${aiResponse}`,
+                    type: 'sticky',
+                    kanbanCol: 'ideas',
+                    pinned: true,
+                    space: 'cork',
+                    x: 50, y: 50,
+                    date: new Date().toISOString(),
+                    color: 'purple'
+                });
+
+                if (input) input.value = '';
+                saveToLocalStorage();
+                renderApp();
+            } catch (err) {
+                if (input) input.value = userPrompt;
+            }
+        }
+
+        // --- SEARCH & TAG FILTERING ---
+        function handleSearch(val) {
+            searchQuery = val.toLowerCase().trim();
+            renderApp();
+        }
+
+        function filterByTag(tag) {
+            activeTagFilter = activeTagFilter === tag ? null : tag;
+            renderApp();
+        }
+
+        function extractTags(text) {
+            const matches = text.match(/#\w+/g);
+            return matches ? matches : [];
+        }
+
+        function updateTagBar() {
+            const tagBar = document.getElementById('tag-bar');
+            const tagContainer = document.getElementById('tag-chips-container');
+            if (!tagBar || !tagContainer) return;
+
+            const allTags = new Set();
+            chits.forEach(c => {
+                const tags = extractTags(c.text);
+                tags.forEach(t => allTags.add(t));
+            });
+
+            if (allTags.size === 0) {
+                tagBar.classList.add('hidden');
+                return;
+            }
+
+            tagBar.classList.remove('hidden');
+            tagContainer.innerHTML = Array.from(allTags).map(tag => `
+                <button onclick="filterByTag('${tag}')" class="px-2.5 py-0.5 rounded-full font-bold transition-all ${activeTagFilter === tag ? 'bg-chits-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300'}">
+                    ${tag}
+                </button>
+            `).join('');
+        }
+
+        // --- EDIT MODAL HANDLERS ---
+        function openEditModal(id) {
+            activeEditId = id;
+            const chit = chits.find(c => c.id === id);
+            if (!chit) return;
+
+            const inputEl = document.getElementById('edit-chit-text-input');
+            if (inputEl) inputEl.value = chit.text;
+            activeEditColor = chit.color || 'yellow';
+            
+            const modal = document.getElementById('modal-edit-chit');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('modal-edit-chit');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function setChitColor(color) {
+            activeEditColor = color;
+        }
+
+        function saveChitEdit() {
+            const chit = chits.find(c => c.id === activeEditId);
+            const inputEl = document.getElementById('edit-chit-text-input');
+            const newText = inputEl ? inputEl.value.trim() : '';
+
+            if (chit && newText) {
+                chit.text = newText;
+                chit.color = activeEditColor;
+
+                if (chit.type === 'todo') {
+                    const lines = newText.split('\n').filter(l => l.trim().length > 0);
+                    chit.items = lines.map(line => ({ text: line, done: false }));
+                }
+
+                saveToLocalStorage();
+                renderApp();
+            }
+            closeEditModal();
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('chits_data', JSON.stringify(chits));
+            localStorage.setItem('chits_focus_history', JSON.stringify(focusHistory));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('chits_data');
+            if (saved) {
+                try { chits = JSON.parse(saved); } catch(e) { chits = initialSamples; }
+            } else {
+                chits = initialSamples;
+            }
+
+            const savedHistory = localStorage.getItem('chits_focus_history');
+            if (savedHistory) {
+                try { focusHistory = JSON.parse(savedHistory); } catch(e) {}
+            }
+        }
+
+        // --- NAVIGATION & VIEWS ---
+        function switchView(viewName) {
+            currentView = viewName;
+            
+            ['chat', 'kanban', 'spaces', 'calendar', 'focus'].forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) el.classList.add('hidden');
+            });
+
+            ['chat', 'kanban', 'calendar', 'focus'].forEach(nav => {
+                const el = document.getElementById(`nav-${nav}`);
+                if (el) {
+                    el.className = "w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all";
+                }
+            });
+
+            ['fridge', 'desk', 'cork', 'wall'].forEach(sp => {
+                const el = document.getElementById(`nav-space-${sp}`);
+                if (el) {
+                    el.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all";
+                }
+            });
+
+            const activeView = document.getElementById(`view-${viewName}`);
+            if (activeView) activeView.classList.remove('hidden');
+
+            const sortBtn = document.getElementById('btn-chat-sort');
+            const viewTitle = document.getElementById('view-title');
+            const viewSubtitle = document.getElementById('view-subtitle');
+
+            if (viewName === 'chat') {
+                const navChat = document.getElementById('nav-chat');
+                if (navChat) navChat.className = "w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-semibold text-sm bg-sky-50 dark:bg-sky-900/30 text-chits-600 dark:text-sky-400 transition-all";
+                if (viewTitle) viewTitle.innerText = "Chat Stream";
+                if (viewSubtitle) viewSubtitle.innerText = "Write quick notes, organize into boards & spaces later";
+                if (sortBtn) sortBtn.classList.remove('hidden');
+            } else if (viewName === 'kanban') {
+                const navKanban = document.getElementById('nav-kanban');
+                if (navKanban) navKanban.className = "w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-semibold text-sm bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 transition-all";
+                if (viewTitle) viewTitle.innerText = "Kanban Board";
+                if (viewSubtitle) viewSubtitle.innerText = "Track your notes through project workflow stages";
+                if (sortBtn) sortBtn.classList.add('hidden');
+                renderKanban();
+            } else if (viewName === 'calendar') {
+                const navCal = document.getElementById('nav-calendar');
+                if (navCal) navCal.className = "w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-semibold text-sm bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 transition-all";
+                if (viewTitle) viewTitle.innerText = "Calendar & Reminders";
+                if (viewSubtitle) viewSubtitle.innerText = "Timeline of your note deadlines & task commitments";
+                if (sortBtn) sortBtn.classList.add('hidden');
+                renderCalendar();
+            } else if (viewName === 'focus') {
+                const navFocus = document.getElementById('nav-focus');
+                if (navFocus) navFocus.className = "w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-semibold text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 transition-all";
+                if (viewTitle) viewTitle.innerText = "Focus Mode Timer";
+                if (viewSubtitle) viewSubtitle.innerText = "Distraction-free timer with quick note capture";
+                if (sortBtn) sortBtn.classList.add('hidden');
+                renderFocusHistory();
+            }
+
+            toggleSidebar(false);
+        }
+
+        function switchSpace(spaceName) {
+            currentSpace = spaceName;
+            switchView('spaces');
+
+            const spacesEl = document.getElementById('view-spaces');
+            if (spacesEl) {
+                spacesEl.classList.remove('hidden', 'bg-fridge-metal', 'bg-slate-200', 'bg-corkboard', 'bg-wall-texture');
+            }
+
+            const activeNav = document.getElementById(`nav-space-${spaceName}`);
+            const viewTitle = document.getElementById('view-title');
+            const viewSubtitle = document.getElementById('view-subtitle');
+
+            if (spaceName === 'fridge') {
+                if (spacesEl) spacesEl.classList.add('bg-fridge-metal');
+                if (viewTitle) viewTitle.innerText = "Fridge Space";
+                if (viewSubtitle) viewSubtitle.innerText = "Magnetic notes & quick household chits";
+                if (activeNav) activeNav.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-semibold text-sm bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 transition-all";
+            } else if (spaceName === 'desk') {
+                if (spacesEl) spacesEl.classList.add('bg-slate-200', 'dark:bg-gray-900');
+                if (viewTitle) viewTitle.innerText = "Desk Surface";
+                if (viewSubtitle) viewSubtitle.innerText = "Clean desk surface workspace";
+                if (activeNav) activeNav.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-semibold text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 transition-all";
+            } else if (spaceName === 'cork') {
+                if (spacesEl) spacesEl.classList.add('bg-corkboard');
+                if (viewTitle) viewTitle.innerText = "Cork Board";
+                if (viewSubtitle) viewSubtitle.innerText = "Classic pinned wooden corkboard surface";
+                if (activeNav) activeNav.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-semibold text-sm bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 transition-all";
+            } else if (spaceName === 'wall') {
+                if (spacesEl) spacesEl.classList.add('bg-wall-texture');
+                if (viewTitle) viewTitle.innerText = "Wall Canvas";
+                if (viewSubtitle) viewSubtitle.innerText = "Minimalist wall canvas space";
+                if (activeNav) activeNav.className = "w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl font-semibold text-sm bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 transition-all";
+            }
+
+            renderSpaceCanvas();
+        }
+
+        function toggleSidebar(show) {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (sidebar && overlay) {
+                if (show) {
+                    sidebar.classList.remove('-translate-x-full');
+                    overlay.classList.remove('hidden');
+                } else {
+                    sidebar.classList.add('-translate-x-full');
+                    overlay.classList.add('hidden');
+                }
+            }
+        }
+
+        // --- LIVING SKY HEADER CONTROLS ---
+        function toggleSkyTheme() {
+            skyTheme = skyTheme === 'day' ? 'night' : 'day';
+            updateSkyVisuals();
+        }
+
+        function updateSkyVisuals() {
+            const header = document.getElementById('sky-header');
+            const sun = document.getElementById('sky-sun');
+            const moon = document.getElementById('sky-moon');
+            const label = document.getElementById('sky-toggle-label');
+            const icon = document.getElementById('sky-toggle-icon');
+
+            if (!header || !sun || !moon) return;
+
+            if (skyTheme === 'day') {
+                header.classList.remove('from-slate-950', 'via-indigo-950', 'to-slate-900');
+                header.classList.add('from-sky-400', 'via-sky-300', 'to-sky-100');
+                sun.classList.remove('hidden');
+                moon.classList.add('hidden');
+                if (label) label.innerText = 'Day Sky';
+                if (icon) icon.className = 'fa-solid fa-sun text-yellow-300';
+            } else {
+                header.classList.remove('from-sky-400', 'via-sky-300', 'to-sky-100');
+                header.classList.add('from-slate-950', 'via-indigo-950', 'to-slate-900');
+                sun.classList.add('hidden');
+                moon.classList.remove('hidden');
+                if (label) label.innerText = 'Night Sky';
+                if (icon) icon.className = 'fa-solid fa-moon text-indigo-200';
+            }
+        }
+
+        // --- CHAT STREAM VIEW LOGIC ---
+        function handleSendChat(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const typeSelect = document.getElementById('chat-type-select');
+            const text = input ? input.value.trim() : '';
+
+            if (!text) return;
+
+            let newItem = {
+                id: Date.now().toString(),
+                text: text,
+                type: typeSelect ? typeSelect.value : 'note',
+                kanbanCol: 'todo',
+                pinned: false,
+                space: 'fridge',
+                x: Math.floor(Math.random() * 180) + 20,
+                y: Math.floor(Math.random() * 150) + 20,
+                date: new Date().toISOString(),
+                reminder: null
+            };
+
+            if (newItem.type === 'todo') {
+                const lines = text.split('\n').filter(l => l.trim().length > 0);
+                newItem.items = lines.map(line => ({ text: line, done: false }));
+            }
+
+            chits.unshift(newItem);
+            if (input) {
+                input.value = '';
+                input.style.height = 'auto';
+            }
+
+            saveToLocalStorage();
+            renderApp();
+        }
+
+        function handleInputKeydown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendChat(e);
+            }
+        }
+
+        function toggleChatSort() {
+            currentSort = currentSort === 'recent' ? 'custom' : 'recent';
+            const label = document.getElementById('chat-sort-label');
+            if (label) label.innerText = currentSort === 'recent' ? 'Recent' : 'My Order';
+            renderChatStream();
+        }
+
+        function getFilteredChits() {
+            return chits.filter(c => {
+                const matchesSearch = !searchQuery || c.text.toLowerCase().includes(searchQuery);
+                const matchesTag = !activeTagFilter || c.text.includes(activeTagFilter);
+                return matchesSearch && matchesTag;
+            });
+        }
+
+        function renderChatStream() {
+            const stream = document.getElementById('chat-stream');
+            if (!stream) return;
+
+            const filteredChits = getFilteredChits();
+
+            if (filteredChits.length === 0) {
+                stream.innerHTML = `
+                    <div id="chat-empty-state" class="text-center py-16 px-4">
+                        <div class="w-20 h-20 mx-auto rounded-3xl bg-sky-100 dark:bg-sky-900/40 text-chits-500 flex items-center justify-center text-3xl mb-4 shadow-inner">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200">Start Writing Your Thoughts</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto mt-1">Send yourself notes, tasks, or lists. You can pin, organize into Kanban columns, or stick them onto Corkboards anytime!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let sortedChits = [...filteredChits];
+
+            if (currentSort === 'recent') {
+                sortedChits.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || new Date(b.date) - new Date(a.date));
+            }
+
+            let html = '';
+            sortedChits.forEach(chit => {
+                const isSticky = chit.type === 'sticky';
+                const isTodo = chit.type === 'todo';
+
+                html += `
+                <div class="group relative flex flex-col sm:flex-row sm:items-start justify-between p-4 sm:p-5 rounded-3xl ${isSticky ? 'bg-amber-100 dark:bg-amber-950/70 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-100' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700/80 text-gray-800 dark:text-gray-100'} border shadow-sm hover:shadow-md transition-all">
+                    
+                    ${chit.pinned ? `<div class="absolute -top-2 left-6 px-2 py-0.5 rounded-full bg-amber-400 text-gray-900 text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center space-x-1"><i class="fa-solid fa-thumbtack"></i> <span>Pinned</span></div>` : ''}
+
+                    <div class="flex-1 pr-4">
+                        <div class="flex items-center space-x-2 text-xs text-gray-400 dark:text-gray-500 mb-1.5">
+                            <span>${new Date(chit.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span>•</span>
+                            <span class="capitalize bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded-md text-[11px] font-semibold">${chit.type}</span>
+                            ${chit.reminder ? `<span class="bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 px-2 py-0.5 rounded-md text-[11px] font-bold"><i class="fa-solid fa-bell text-[10px] mr-1"></i>${chit.reminder}</span>` : ''}
+                        </div>
+
+                        ${isTodo ? `
+                            <div class="space-y-1.5 mt-2">
+                                ${chit.items ? chit.items.map((item, idx) => `
+                                    <label class="flex items-center space-x-2.5 cursor-pointer text-sm font-medium">
+                                        <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleTodoItem('${chit.id}', ${idx})" class="w-4 h-4 rounded text-chits-500 focus:ring-chits-400">
+                                        <span class="${item.done ? 'line-through text-gray-400 dark:text-gray-500' : ''}">${escapeHtml(item.text)}</span>
+                                    </label>
+                                `).join('') : `<p class="text-sm font-medium">${escapeHtml(chit.text)}</p>`}
+                            </div>
+                        ` : `
+                            <p class="text-sm sm:text-base ${isSticky ? 'font-handwriting text-lg leading-snug' : 'font-normal'} whitespace-pre-wrap">${escapeHtml(chit.text)}</p>
+                        `}
+                    </div>
+
+                    <div class="mt-3 sm:mt-0 flex items-center justify-end space-x-1 border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-100 dark:border-gray-700/60">
+                        <button onclick="openEditModal('${chit.id}')" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-chits-500 transition-colors" title="Edit Note">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+
+                        <button onclick="togglePinNote('${chit.id}')" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-amber-500 transition-colors" title="Pin Chit">
+                            <i class="fa-solid fa-thumbtack ${chit.pinned ? 'text-amber-500' : ''}"></i>
+                        </button>
+
+                        <button onclick="toggleStickyType('${chit.id}')" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-yellow-600 transition-colors" title="Toggle Sticky Style">
+                            <i class="fa-solid fa-note-sticky"></i>
+                        </button>
+
+                        <button onclick="openReminderModal('${chit.id}')" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-rose-500 transition-colors" title="Add Reminder">
+                            <i class="fa-solid fa-bell"></i>
+                        </button>
+
+                        <div class="relative group/menu inline-block">
+                            <button class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-teal-500 transition-colors" title="Move to Space">
+                                <i class="fa-solid fa-shapes"></i>
+                            </button>
+                            <div class="absolute right-0 bottom-full mb-1 hidden group-hover/menu:flex flex-col bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-1.5 z-30 min-w-[130px]">
+                                <button onclick="moveChitToSpace('${chit.id}', 'fridge')" class="text-xs px-3 py-1.5 rounded-xl text-left hover:bg-teal-50 dark:hover:bg-teal-950/40 text-teal-600 dark:text-teal-300 font-semibold">Fridge</button>
+                                <button onclick="moveChitToSpace('${chit.id}', 'desk')" class="text-xs px-3 py-1.5 rounded-xl text-left hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-600 dark:text-amber-300 font-semibold">Desk</button>
+                                <button onclick="moveChitToSpace('${chit.id}', 'cork')" class="text-xs px-3 py-1.5 rounded-xl text-left hover:bg-orange-50 dark:hover:bg-orange-950/40 text-orange-600 dark:text-orange-300 font-semibold">Cork Board</button>
+                                <button onclick="moveChitToSpace('${chit.id}', 'wall')" class="text-xs px-3 py-1.5 rounded-xl text-left hover:bg-purple-50 dark:hover:bg-purple-950/40 text-purple-600 dark:text-purple-300 font-semibold">Wall Canvas</button>
+                            </div>
+                        </div>
+
+                        <button onclick="openShareModal('${chit.id}')" class="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-chits-500 transition-colors" title="Export Share Card">
+                            <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                        </button>
+
+                        <button onclick="deleteChit('${chit.id}')" class="p-2 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 text-gray-400 hover:text-rose-500 transition-colors" title="Delete Note">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+
+                </div>
+                `;
+            });
+
+            stream.innerHTML = html;
+        }
+
+        // --- CREATIVE SPACES LOGIC ---
+        function promptAddSpaceChit() {
+            const spaceNames = {
+                fridge: 'Fridge Magnets',
+                desk: 'Desk Surface',
+                cork: 'Cork Board',
+                wall: 'Wall Canvas'
+            };
+            const titleEl = document.getElementById('modal-space-title');
+            if (titleEl) titleEl.innerText = `Add Chit to ${spaceNames[currentSpace] || 'Space'}`;
+            
+            const inputEl = document.getElementById('space-chit-text-input');
+            if (inputEl) inputEl.value = '';
+
+            const modal = document.getElementById('modal-add-space-chit');
+            if (modal) {
+                modal.classList.remove('hidden');
+                setTimeout(() => inputEl?.focus(), 100);
+            }
+        }
+
+        function closeSpaceChitModal() {
+            const modal = document.getElementById('modal-add-space-chit');
+            if (modal) modal.classList.add('hidden');
+            const inputEl = document.getElementById('space-chit-text-input');
+            if (inputEl) inputEl.value = '';
+        }
+
+        function confirmAddSpaceChit() {
+            const inputEl = document.getElementById('space-chit-text-input');
+            const text = inputEl ? inputEl.value.trim() : '';
+
+            if (text) {
+                const spaceType = currentSpace === 'cork' ? 'sticky' : 'note';
+                chits.unshift({
+                    id: Date.now().toString(),
+                    text: text,
+                    type: spaceType,
+                    kanbanCol: 'todo',
+                    pinned: currentSpace === 'cork',
+                    space: currentSpace,
+                    x: Math.floor(Math.random() * 100) + 30,
+                    y: Math.floor(Math.random() * 80) + 60,
+                    date: new Date().toISOString(),
+                    reminder: null
+                });
+                saveToLocalStorage();
+                renderApp();
+            }
+            closeSpaceChitModal();
+        }
+
+        function renderSpaceCanvas() {
+            const container = document.getElementById('space-canvas-items');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const filtered = getFilteredChits().filter(c => (c.space || 'fridge') === currentSpace);
+            const isMobile = window.innerWidth < 640;
+
+            filtered.forEach((chit, idx) => {
+                const card = document.createElement('div');
+                card.id = `space-item-${chit.id}`;
+                card.style.position = 'absolute';
+                
+                const defaultX = isMobile ? (10 + (idx % 2) * 160) : (20 + idx * 40);
+                const defaultY = isMobile ? (20 + Math.floor(idx / 2) * 140) : (30 + idx * 30);
+                
+                card.style.left = `${chit.x !== undefined ? Math.min(chit.x, window.innerWidth - 180) : defaultX}px`;
+                card.style.top = `${chit.y !== undefined ? chit.y : defaultY}px`;
+
+                let cardStyleClass = '';
+                let pinDecoration = '';
+
+                if (currentSpace === 'cork') {
+                    cardStyleClass = 'bg-amber-100 text-amber-950 font-handwriting text-base sm:text-lg p-4 sm:p-5 rounded-xl sticky-note border border-amber-300 w-44 sm:w-56 transform rotate-[-2deg]';
+                    pinDecoration = `<div class="w-4 h-4 rounded-full bg-red-500 shadow-md absolute -top-2 left-1/2 -translate-x-1/2 border border-white"></div>`;
+                } else if (currentSpace === 'fridge') {
+                    cardStyleClass = 'bg-sky-100 text-sky-950 p-4 rounded-2xl sticky-note border border-sky-200 w-44 sm:w-52 shadow-md';
+                    pinDecoration = `<div class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-rose-500 text-white font-bold text-[10px] flex items-center justify-center shadow-md absolute -top-3 -left-2 border-2 border-white">chit</div>`;
+                } else if (currentSpace === 'wall') {
+                    cardStyleClass = 'bg-white text-gray-800 p-4 sm:p-5 rounded-2xl shadow-xl border border-gray-200 w-48 sm:w-64';
+                    pinDecoration = `<div class="w-8 h-2 bg-amber-200/80 absolute -top-1 left-1/2 -translate-x-1/2 transform -rotate-2"></div>`;
+                } else {
+                    cardStyleClass = 'bg-white dark:bg-gray-800 dark:text-white p-4 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 w-48 sm:w-60';
+                }
+
+                card.className = `${cardStyleClass} cursor-move select-none z-10`;
+                card.innerHTML = `
+                    ${pinDecoration}
+                    <p class="mt-1" onclick="openEditModal('${chit.id}')">${escapeHtml(chit.text)}</p>
+                `;
+
+                makeElementDraggable(card, chit);
+                container.appendChild(card);
+            });
+        }
+
+        function makeElementDraggable(elm, chit) {
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            elm.onmousedown = dragMouseDown;
+            elm.ontouchstart = dragTouchStart;
+
+            function dragMouseDown(e) {
+                e = e || window.event;
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = closeDragElement;
+                document.onmousemove = elementDrag;
+            }
+
+            function dragTouchStart(e) {
+                const touch = e.touches[0];
+                pos3 = touch.clientX;
+                pos4 = touch.clientY;
+                document.ontouchend = closeDragElement;
+                document.ontouchmove = elementTouchDrag;
+            }
+
+            function elementDrag(e) {
+                e = e || window.event;
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                const container = document.getElementById('space-canvas-items');
+                const maxLeft = container ? (container.clientWidth - elm.offsetWidth) : 1000;
+                const maxTop = container ? (container.clientHeight - elm.offsetHeight) : 1000;
+
+                const newLeft = Math.max(0, Math.min(elm.offsetLeft - pos1, maxLeft));
+                const newTop = Math.max(0, Math.min(elm.offsetTop - pos2, maxTop));
+                
+                elm.style.top = newTop + "px";
+                elm.style.left = newLeft + "px";
+                chit.x = newLeft;
+                chit.y = newTop;
+            }
+
+            function elementTouchDrag(e) {
+                const touch = e.touches[0];
+                pos1 = pos3 - touch.clientX;
+                pos2 = pos4 - touch.clientY;
+                pos3 = touch.clientX;
+                pos4 = touch.clientY;
+
+                const container = document.getElementById('space-canvas-items');
+                const maxLeft = container ? (container.clientWidth - elm.offsetWidth) : 1000;
+                const maxTop = container ? (container.clientHeight - elm.offsetHeight) : 1000;
+
+                const newLeft = Math.max(0, Math.min(elm.offsetLeft - pos1, maxLeft));
+                const newTop = Math.max(0, Math.min(elm.offsetTop - pos2, maxTop));
+
+                elm.style.top = newTop + "px";
+                elm.style.left = newLeft + "px";
+                chit.x = newLeft;
+                chit.y = newTop;
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+                document.ontouchend = null;
+                document.ontouchmove = null;
+                saveToLocalStorage();
+            }
+        }
+
+        // --- CALENDAR & REMINDERS LOGIC ---
+        function changeMonth(delta) {
+            calendarDate.setMonth(calendarDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const monthTitle = document.getElementById('calendar-month-year');
+            const listEl = document.getElementById('reminders-list');
+
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const year = calendarDate.getFullYear();
+            const month = calendarDate.getMonth();
+
+            if (monthTitle) {
+                monthTitle.innerText = calendarDate.toLocaleDateString([], { month: 'long', year: 'numeric' });
+            }
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < firstDay; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'h-20 bg-transparent';
+                grid.appendChild(empty);
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const hasReminder = chits.filter(c => {
+                    if (!c.reminder) return false;
+                    const remDate = new Date(c.reminder);
+                    return remDate.getFullYear() === year && remDate.getMonth() === month && remDate.getDate() === day;
+                });
+
+                const cell = document.createElement('div');
+                cell.className = `h-20 p-2 rounded-2xl border ${hasReminder.length > 0 ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700/60'} flex flex-col justify-between`;
+                
+                cell.innerHTML = `
+                    <span class="text-xs font-bold text-gray-500">${day}</span>
+                    ${hasReminder.length > 0 ? `<div class="text-[10px] font-bold bg-rose-500 text-white px-1.5 py-0.5 rounded-md truncate">${hasReminder.length} note(s)</div>` : ''}
+                `;
+                grid.appendChild(cell);
+            }
+
+            const reminderChits = chits.filter(c => c.reminder);
+            if (listEl) {
+                if (reminderChits.length === 0) {
+                    listEl.innerHTML = `<p class="text-xs text-gray-400 py-2">No scheduled note reminders set.</p>`;
+                } else {
+                    listEl.innerHTML = reminderChits.map(c => `
+                        <div class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-gray-700/40 text-xs">
+                            <div>
+                                <span class="font-bold text-rose-500 mr-2">${c.reminder}</span>
+                                <span class="text-gray-800 dark:text-gray-200">${escapeHtml(c.text)}</span>
+                            </div>
+                            <button onclick="removeReminder('${c.id}')" class="text-gray-400 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        function openReminderModal(chitId) {
+            activeReminderId = chitId;
+            const modal = document.getElementById('modal-reminder');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeReminderModal() {
+            const modal = document.getElementById('modal-reminder');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveNoteReminder() {
+            const inputEl = document.getElementById('reminder-date-input');
+            const dateVal = inputEl ? inputEl.value : null;
+            const chit = chits.find(c => c.id === activeReminderId);
+            if (chit && dateVal) {
+                chit.reminder = dateVal;
+                saveToLocalStorage();
+                renderApp();
+            }
+            closeReminderModal();
+        }
+
+        function removeReminder(chitId) {
+            const chit = chits.find(c => c.id === chitId);
+            if (chit) {
+                chit.reminder = null;
+                saveToLocalStorage();
+                renderApp();
+            }
+        }
+
+        // --- FOCUS MODE LOGIC ---
+        function toggleFocusTimer() {
+            const btn = document.getElementById('btn-focus-start');
+            const mascot = document.getElementById('focus-mascot');
+            const speech = document.getElementById('mascot-speech');
+
+            if (isTimerRunning) {
+                clearInterval(timerInterval);
+                isTimerRunning = false;
+                if (btn) btn.innerText = "Resume Focus";
+                if (speech) speech.innerText = "Paused";
+            } else {
+                isTimerRunning = true;
+                if (btn) btn.innerText = "Pause";
+                if (speech) speech.innerText = "Focusing!";
+                if (mascot) mascot.innerText = '🐶';
+
+                timerInterval = setInterval(() => {
+                    if (timerSeconds > 0) {
+                        timerSeconds--;
+                        updateTimerDisplay();
+                    } else {
+                        clearInterval(timerInterval);
+                        isTimerRunning = false;
+                        if (btn) btn.innerText = "Start Focus";
+                        if (speech) speech.innerText = "Completed!";
+                        if (mascot) mascot.innerText = '🎉';
+                        logFocusSession("25 Min Focus Completed");
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetFocusTimer() {
+            clearInterval(timerInterval);
+            isTimerRunning = false;
+            timerSeconds = 25 * 60;
+            updateTimerDisplay();
+            const btn = document.getElementById('btn-focus-start');
+            const speech = document.getElementById('mascot-speech');
+            const mascot = document.getElementById('focus-mascot');
+            if (btn) btn.innerText = "Start Focus";
+            if (speech) speech.innerText = "Ready!";
+            if (mascot) mascot.innerText = '🐶';
+        }
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(timerSeconds / 60);
+            const secs = timerSeconds % 60;
+            const display = document.getElementById('timer-display');
+            if (display) display.innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function saveFocusNote() {
+            const input = document.getElementById('focus-quick-input');
+            const val = input ? input.value.trim() : '';
+            if (val) {
+                chits.unshift({
+                    id: Date.now().toString(),
+                    text: `🎯 Focus Note: ${val}`,
+                    type: 'sticky',
+                    kanbanCol: 'todo',
+                    pinned: true,
+                    space: 'desk',
+                    x: 40, y: 40,
+                    date: new Date().toISOString()
+                });
+                logFocusSession(`Note: ${val}`);
+                if (input) input.value = '';
+                saveToLocalStorage();
+                renderApp();
+            }
+        }
+
+        function logFocusSession(entry) {
+            focusHistory.unshift({ text: entry, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+            saveToLocalStorage();
+            renderFocusHistory();
+        }
+
+        function renderFocusHistory() {
+            const list = document.getElementById('focus-history-list');
+            if (!list) return;
+            if (focusHistory.length === 0) {
+                list.innerHTML = `<p class="text-indigo-300/60 italic">No focus logs recorded yet today.</p>`;
+            } else {
+                list.innerHTML = focusHistory.map(h => `
+                    <div class="flex items-center justify-between py-1 border-b border-white/10">
+                        <span>${escapeHtml(h.text)}</span>
+                        <span class="text-[10px] text-indigo-300">${h.time}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // --- SHARE CARD EXPORTER ---
+        function openShareModal(chitId) {
+            activeShareId = chitId;
+            const chit = chits.find(c => c.id === chitId);
+            if (!chit) return;
+
+            const cardText = document.getElementById('share-card-text');
+            const cardDate = document.getElementById('share-card-date');
+            if (cardText) cardText.innerText = `"${chit.text}"`;
+            if (cardDate) cardDate.innerText = new Date(chit.date).toLocaleDateString();
+
+            const modal = document.getElementById('modal-share-card');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeShareModal() {
+            const modal = document.getElementById('modal-share-card');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function setShareTheme(theme) {
+            const card = document.getElementById('share-card-canvas');
+            if (!card) return;
+            card.className = "w-full p-8 rounded-3xl text-white shadow-xl transition-all relative overflow-hidden min-h-[220px] flex flex-col justify-between ";
+
+            if (theme === 'gradient-sky') {
+                card.classList.add('bg-gradient-to-tr', 'from-sky-400', 'to-indigo-500');
+            } else if (theme === 'gradient-sunset') {
+                card.classList.add('bg-gradient-to-tr', 'from-amber-400', 'to-rose-500');
+            } else if (theme === 'theme-cork') {
+                card.classList.add('bg-amber-800', 'font-handwriting');
+            } else if (theme === 'theme-dark') {
+                card.classList.add('bg-gray-900', 'border', 'border-gray-700');
+            }
+        }
+
+        function downloadShareCard() {
+            const cardNode = document.getElementById('share-card-canvas');
+            if (!cardNode) return;
+            html2canvas(cardNode, { borderRadius: 24 }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `chit-card-${Date.now()}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+                closeShareModal();
+            });
+        }
+
+        // --- CORE APP REFRESH & RENDER ---
+        function renderApp() {
+            const chatBadge = document.getElementById('badge-chat-count');
+            const kanbanBadge = document.getElementById('badge-kanban-count');
+            const totalBadge = document.getElementById('total-chits-count');
+
+            if (chatBadge) chatBadge.innerText = chits.length;
+            if (kanbanBadge) kanbanBadge.innerText = chits.length;
+            if (totalBadge) totalBadge.innerText = chits.length;
+
+            updateTagBar();
+            renderChatStream();
+            if (currentView === 'kanban') renderKanban();
+            if (currentView === 'spaces') renderSpaceCanvas();
+        }
+
+        // --- KANBAN BOARD HANDLERS ---
+        function renderKanban() {
+            const cols = {
+                todo: document.getElementById('kanban-col-todo'),
+                progress: document.getElementById('kanban-col-progress'),
+                ideas: document.getElementById('kanban-col-ideas'),
+                done: document.getElementById('kanban-col-done')
+            };
+
+            const counts = {
+                todo: document.getElementById('kanban-count-todo'),
+                progress: document.getElementById('kanban-count-progress'),
+                ideas: document.getElementById('kanban-count-ideas'),
+                done: document.getElementById('kanban-count-done')
+            };
+
+            Object.keys(cols).forEach(key => {
+                if (cols[key]) cols[key].innerHTML = '';
+            });
+
+            const colCounts = { todo: 0, progress: 0, ideas: 0, done: 0 };
+            const filteredChits = getFilteredChits();
+
+            filteredChits.forEach(chit => {
+                const colKey = chit.kanbanCol || 'todo';
+                if (cols[colKey]) {
+                    colCounts[colKey]++;
+                    const card = document.createElement('div');
+                    card.draggable = true;
+                    card.ondragstart = (e) => e.dataTransfer.setData('text/plain', chit.id);
+                    card.className = "bg-white dark:bg-gray-800 p-3.5 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-2 cursor-grab active:cursor-grabbing hover:shadow-md transition-all";
+                    
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between text-[11px] text-gray-400">
+                            <span class="capitalize font-semibold bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md text-gray-600 dark:text-gray-300">${chit.type}</span>
+                            <span>${new Date(chit.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                        </div>
+                        <p class="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-100" onclick="openEditModal('${chit.id}')">${escapeHtml(chit.text)}</p>
+                        <div class="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-700/60 text-xs">
+                            <span class="text-[10px] text-teal-600 dark:text-teal-400 capitalize font-medium"><i class="fa-solid fa-shapes mr-1"></i>${chit.space || 'fridge'}</span>
+                            <button onclick="deleteChit('${chit.id}')" class="text-gray-400 hover:text-rose-500"><i class="fa-solid fa-trash text-xs"></i></button>
+                        </div>
+                    `;
+                    cols[colKey].appendChild(card);
+                }
+            });
+
+            Object.keys(counts).forEach(key => {
+                if (counts[key]) counts[key].innerText = colCounts[key];
+            });
+        }
+
+        function allowDrop(e) {
+            e.preventDefault();
+        }
+
+        function dropCard(e, targetCol) {
+            e.preventDefault();
+            const id = e.dataTransfer.getData('text/plain');
+            const chit = chits.find(c => c.id === id);
+            if (chit) {
+                chit.kanbanCol = targetCol;
+                saveToLocalStorage();
+                renderKanban();
+            }
+        }
+
+        function promptQuickKanbanAdd(column) {
+            targetKanbanColumn = column;
+            const columnNames = {
+                todo: 'To Do',
+                progress: 'In Progress',
+                ideas: 'Ideas & Review',
+                done: 'Completed'
+            };
+            const titleEl = document.getElementById('modal-kanban-title');
+            if (titleEl) titleEl.innerText = `Add Card to ${columnNames[column] || 'Kanban'}`;
+
+            const inputEl = document.getElementById('kanban-card-text-input');
+            if (inputEl) inputEl.value = '';
+
+            const modal = document.getElementById('modal-add-kanban');
+            if (modal) {
+                modal.classList.remove('hidden');
+                setTimeout(() => inputEl?.focus(), 100);
+            }
+        }
+
+        function closeKanbanModal() {
+            const modal = document.getElementById('modal-add-kanban');
+            if (modal) modal.classList.add('hidden');
+            const inputEl = document.getElementById('kanban-card-text-input');
+            if (inputEl) inputEl.value = '';
+        }
+
+        function confirmAddKanbanCard() {
+            const inputEl = document.getElementById('kanban-card-text-input');
+            const text = inputEl ? inputEl.value.trim() : '';
+
+            if (text) {
+                chits.unshift({
+                    id: Date.now().toString(),
+                    text: text,
+                    type: 'note',
+                    kanbanCol: targetKanbanColumn,
+                    pinned: false,
+                    space: 'fridge',
+                    x: 30, y: 30,
+                    date: new Date().toISOString()
+                });
+                saveToLocalStorage();
+                renderApp();
+            }
+            closeKanbanModal();
+        }
+
+        // --- ITEM HELPERS ---
+        function togglePinNote(id) {
+            const chit = chits.find(c => c.id === id);
+            if (chit) {
+                chit.pinned = !chit.pinned;
+                saveToLocalStorage();
+                renderApp();
+            }
+        }
+
+        function toggleStickyType(id) {
+            const chit = chits.find(c => c.id === id);
+            if (chit) {
+                chit.type = chit.type === 'sticky' ? 'note' : 'sticky';
+                saveToLocalStorage();
+                renderApp();
+            }
+        }
+
+        function moveChitToSpace(id, spaceName) {
+            const chit = chits.find(c => c.id === id);
+            if (chit) {
+                chit.space = spaceName;
+                saveToLocalStorage();
+                renderApp();
+            }
+        }
+
+        function toggleTodoItem(chitId, itemIdx) {
+            const chit = chits.find(c => c.id === chitId);
+            if (chit && chit.items && chit.items[itemIdx]) {
+                chit.items[itemIdx].done = !chit.items[itemIdx].done;
+                saveToLocalStorage();
+                renderApp();
+            }
+        }
+
+        function deleteChit(id) {
+            chits = chits.filter(c => c.id !== id);
+            saveToLocalStorage();
+            renderApp();
+        }
+
+        function triggerMockAttachment() {
+            const input = document.getElementById('chat-input');
+            if (input) input.value += (input.value ? '\n' : '') + '📎 [Attachment: Document.pdf]';
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            const icon = document.getElementById('theme-toggle-icon');
+            if (icon) {
+                if (document.documentElement.classList.contains('dark')) {
+                    icon.className = 'fa-solid fa-sun text-yellow-400';
+                } else {
+                    icon.className = 'fa-solid fa-moon text-gray-600';
+                }
+            }
+        }
+
+        function escapeHtml(str) {
+            return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") : '';
+        }
+    </script>
+</body>
+</html>
